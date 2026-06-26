@@ -159,13 +159,21 @@ function getIndustryTheme(industry: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { rawText, instagram, lineUrl, googleCalUrl, reservationTypes } = await req.json();
+  const { rawText, mode, manualInfo, instagram, lineUrl, googleCalUrl, reservationTypes } = await req.json();
 
-  if (!rawText || rawText.trim().length < 10) {
-    return NextResponse.json({ error: "Googleマップの情報を貼り付けてください" }, { status: 400 });
-  }
-  if (rawText.length > 5000) {
-    return NextResponse.json({ error: "テキストが長すぎます（5000文字以内）" }, { status: 400 });
+  const isManual = mode === "manual";
+
+  if (isManual) {
+    if (!manualInfo?.businessName?.trim()) {
+      return NextResponse.json({ error: "店名を入力してください" }, { status: 400 });
+    }
+  } else {
+    if (!rawText || rawText.trim().length < 10) {
+      return NextResponse.json({ error: "Googleマップの情報を貼り付けてください" }, { status: 400 });
+    }
+    if (rawText.length > 5000) {
+      return NextResponse.json({ error: "テキストが長すぎます（5000文字以内）" }, { status: 400 });
+    }
   }
 
   const isValidUrl = (v: unknown) =>
@@ -177,13 +185,30 @@ export async function POST(req: NextRequest) {
   const safeResvTypes: string[] =
     Array.isArray(reservationTypes) ? reservationTypes.filter((v: unknown) => typeof v === "string") : ["phone"];
 
-  // Step 1: Extract structured info from raw Google Maps paste
-  const extractionResponse = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 2048,
-    messages: [{
-      role: "user",
-      content: `以下のGoogleマップからコピーしたテキストから情報を抽出してJSON形式で返してください。
+  let bizInfo: Record<string, string>;
+
+  if (isManual) {
+    bizInfo = {
+      businessName: String(manualInfo.businessName || ""),
+      industry:     String(manualInfo.industry     || ""),
+      area:         String(manualInfo.area         || ""),
+      phone:        String(manualInfo.phone        || ""),
+      hours:        String(manualInfo.hours        || ""),
+      priceRange:   String(manualInfo.priceRange   || ""),
+      services:     String(manualInfo.services     || ""),
+      menu:         String(manualInfo.menu         || ""),
+      rating:       "",
+      reviewCount:  "",
+      reviews:      "",
+    };
+  } else {
+    // Step 1: Extract structured info from raw Google Maps paste
+    const extractionResponse = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2048,
+      messages: [{
+        role: "user",
+        content: `以下のGoogleマップからコピーしたテキストから情報を抽出してJSON形式で返してください。
 
 <source>
 ${rawText.slice(0, 3000)}
@@ -203,20 +228,20 @@ ${rawText.slice(0, 3000)}
   "reviewCount": "レビュー数",
   "reviews": "クチコミテキスト（あれば）"
 }`
-    }]
-  });
+      }]
+    });
 
-  const extractionText = extractionResponse.content[0];
-  if (extractionText.type !== "text") {
-    return NextResponse.json({ error: "情報の抽出に失敗しました" }, { status: 500 });
-  }
+    const extractionText = extractionResponse.content[0];
+    if (extractionText.type !== "text") {
+      return NextResponse.json({ error: "情報の抽出に失敗しました" }, { status: 500 });
+    }
 
-  let bizInfo: Record<string, string>;
-  try {
-    const jsonMatch = extractionText.text.match(/\{[\s\S]*\}/);
-    bizInfo = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
-  } catch {
-    return NextResponse.json({ error: "情報の解析に失敗しました" }, { status: 500 });
+    try {
+      const jsonMatch = extractionText.text.match(/\{[\s\S]*\}/);
+      bizInfo = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+    } catch {
+      return NextResponse.json({ error: "情報の解析に失敗しました" }, { status: 500 });
+    }
   }
 
   const industryTheme = getIndustryTheme(bizInfo.industry || "");
@@ -261,12 +286,7 @@ VISUAL EFFECTS:
    - Add data-tilt data-tilt-max="8" data-tilt-scale="1.03" data-tilt-glare="false" to EVERY menu card and EVERY review card element
    - Initialize after DOMContentLoaded: VanillaTilt.init(document.querySelectorAll("[data-tilt]"),{max:8,scale:1.03,glare:false})
 
-2. CSS scroll-snap
-   - On the <html> element: scroll-snap-type:y mandatory
-   - On EVERY <section> element: scroll-snap-align:start; scroll-snap-stop:always
-   - Do NOT add scroll-snap to navbar or footer
-
-3. Hero video loop background
+2. Hero video loop background
    - Inside the hero <section>, as FIRST child: <video autoplay muted loop playsinline class="hero-video"></video> — no src attribute (fails gracefully, CSS fallback shows)
    - .hero-video: position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:0
    - Hero section base style: position:relative; overflow:hidden; background: linear-gradient(135deg, var(--bg) 0%, var(--bg2) 50%, var(--accent) 100%); background-size:200% 200%; animation:heroGradient 8s ease infinite
@@ -337,7 +357,7 @@ SOCIAL & RESERVATION:
 
 SECTIONS:
 1. Fixed navbar (name + 4 links + hamburger${safeInstagram ? " + Instagram icon link in nav" : ""})
-2. Hero 100vh (particles layer + video loop bg + animated gradient fallback + heroZoom animation + overlay — see VISUAL EFFECTS #3 and #7; huge name + tagline + reservation CTA buttons based on enabled types)
+2. Hero 100vh (particles layer + video loop bg + animated gradient fallback + heroZoom animation + overlay — see VISUAL EFFECTS #2 and #6; huge name + tagline + reservation CTA buttons based on enabled types)
 3. About (rating ★, hours table, service tags)
 4. Menu cards (max 6, ◆ bullet style)
 5. Reviews (2-3 cards with actual review text)

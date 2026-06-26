@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 
 type ReservationType = "phone" | "line" | "google";
+type InputMode = "google" | "manual";
 
 type HistoryEntry = {
   businessName: string;
@@ -14,19 +15,34 @@ type HistoryEntry = {
 const HISTORY_KEY = "site-gen-history";
 
 export default function Home() {
+  const [inputMode, setInputMode] = useState<InputMode>("google");
+
+  // Google Maps mode
   const [rawText, setRawText] = useState("");
-  const [instagram, setInstagram] = useState("");
-  const [lineUrl, setLineUrl] = useState("");
-  const [googleCalUrl, setGoogleCalUrl] = useState("");
+
+  // Manual input mode
+  const [manualBizName, setManualBizName]       = useState("");
+  const [manualIndustry, setManualIndustry]     = useState("");
+  const [manualArea, setManualArea]             = useState("");
+  const [manualPhone, setManualPhone]           = useState("");
+  const [manualHours, setManualHours]           = useState("");
+  const [manualPriceRange, setManualPriceRange] = useState("");
+  const [manualServices, setManualServices]     = useState("");
+  const [manualMenu, setManualMenu]             = useState("");
+
+  // Shared
+  const [instagram, setInstagram]           = useState("");
+  const [lineUrl, setLineUrl]               = useState("");
+  const [googleCalUrl, setGoogleCalUrl]     = useState("");
   const [reservationTypes, setReservationTypes] = useState<ReservationType[]>(["phone"]);
-  const [html, setHtml] = useState("");
-  const [bizInfo, setBizInfo] = useState<Record<string, string> | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [step, setStep] = useState<"idle" | "extracting" | "generating" | "done">("idle");
-  const [darkMode, setDarkMode] = useState(true);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [html, setHtml]                     = useState("");
+  const [bizInfo, setBizInfo]               = useState<Record<string, string> | null>(null);
+  const [loading, setLoading]               = useState(false);
+  const [error, setError]                   = useState("");
+  const [copied, setCopied]                 = useState(false);
+  const [step, setStep]                     = useState<"idle" | "extracting" | "generating" | "done">("idle");
+  const [darkMode, setDarkMode]             = useState(true);
+  const [history, setHistory]               = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
     try {
@@ -54,6 +70,9 @@ export default function Home() {
     badge:       "bg-blue-950 text-blue-300 border border-blue-800",
     divider:     "border-gray-800",
     copyLink:    "text-blue-400 hover:text-blue-300",
+    modeActive:  "bg-blue-600 text-white",
+    modeInactive:"text-gray-400 hover:text-gray-200",
+    modeBg:      "bg-gray-800 border-gray-700",
   } : {
     main:        "bg-gray-50 text-gray-900",
     card:        "bg-white border-gray-200",
@@ -73,6 +92,9 @@ export default function Home() {
     badge:       "bg-blue-50 text-blue-700 border border-blue-200",
     divider:     "border-gray-200",
     copyLink:    "text-blue-600 hover:text-blue-700",
+    modeActive:  "bg-blue-600 text-white",
+    modeInactive:"text-gray-500 hover:text-gray-700",
+    modeBg:      "bg-gray-100 border-gray-200",
   };
 
   const toggleReservation = (type: ReservationType) => {
@@ -81,18 +103,41 @@ export default function Home() {
     );
   };
 
+  const isGenerateDisabled = loading || (
+    inputMode === "google"
+      ? rawText.trim().length < 10
+      : !manualBizName.trim()
+  );
+
   const handleGenerate = async () => {
     setLoading(true);
     setError("");
     setHtml("");
     setBizInfo(null);
-    setStep("extracting");
+    setStep(inputMode === "google" ? "extracting" : "generating");
 
     try {
+      const body = inputMode === "manual"
+        ? {
+            mode: "manual",
+            manualInfo: {
+              businessName: manualBizName,
+              industry:     manualIndustry,
+              area:         manualArea,
+              phone:        manualPhone,
+              hours:        manualHours,
+              priceRange:   manualPriceRange,
+              services:     manualServices,
+              menu:         manualMenu,
+            },
+            instagram, lineUrl, googleCalUrl, reservationTypes,
+          }
+        : { rawText, instagram, lineUrl, googleCalUrl, reservationTypes };
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rawText, instagram, lineUrl, googleCalUrl, reservationTypes }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "生成失敗");
@@ -149,10 +194,10 @@ export default function Home() {
       <div className="max-w-3xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-start justify-between mb-10">
+        <div className="flex items-start justify-between mb-8">
           <div>
             <h1 className={`text-3xl font-bold mb-2 ${theme.heading}`}>AIサイト自動生成</h1>
-            <p className={`text-sm ${theme.labelMuted}`}>Googleマップの情報をコピペするだけでプロ品質のサイトを生成します</p>
+            <p className={`text-sm ${theme.labelMuted}`}>店舗情報からプロ品質のサイトを自動生成します</p>
           </div>
           <button
             onClick={() => setDarkMode(d => !d)}
@@ -162,21 +207,128 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Step 1: Googleマップ */}
+        {/* Input Mode Toggle */}
+        <div className={`border rounded-xl p-1 mb-4 flex gap-1 ${theme.modeBg}`}>
+          <button
+            onClick={() => setInputMode("google")}
+            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+              inputMode === "google" ? theme.modeActive : theme.modeInactive
+            }`}
+          >
+            Googleマップ貼り付け
+          </button>
+          <button
+            onClick={() => setInputMode("manual")}
+            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+              inputMode === "manual" ? theme.modeActive : theme.modeInactive
+            }`}
+          >
+            手動入力
+          </button>
+        </div>
+
+        {/* Step 1: Input */}
         <div className={`border rounded-xl p-5 mb-4 ${theme.card}`}>
-          <p className={`text-xs font-bold uppercase tracking-widest mb-3 ${theme.stepLabel}`}>Step 1 — Googleマップ情報</p>
-          <ol className={`text-sm space-y-1 list-decimal list-inside mb-4 ${theme.labelMuted}`}>
-            <li>Googleマップでお店のページを開く</li>
-            <li>店名・住所・クチコミまで全部コピー</li>
-            <li>下に貼り付ける</li>
-          </ol>
-          <textarea
-            value={rawText}
-            onChange={(e) => setRawText(e.target.value)}
-            rows={10}
-            placeholder="Googleマップからコピーしたテキストをそのまま貼り付けてください"
-            className={`w-full border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${theme.input}`}
-          />
+          {inputMode === "google" ? (
+            <>
+              <p className={`text-xs font-bold uppercase tracking-widest mb-3 ${theme.stepLabel}`}>Step 1 — Googleマップ情報</p>
+              <ol className={`text-sm space-y-1 list-decimal list-inside mb-4 ${theme.labelMuted}`}>
+                <li>Googleマップでお店のページを開く</li>
+                <li>店名・住所・クチコミまで全部コピー</li>
+                <li>下に貼り付ける</li>
+              </ol>
+              <textarea
+                value={rawText}
+                onChange={(e) => setRawText(e.target.value)}
+                rows={10}
+                placeholder="Googleマップからコピーしたテキストをそのまま貼り付けてください"
+                className={`w-full border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${theme.input}`}
+              />
+            </>
+          ) : (
+            <>
+              <p className={`text-xs font-bold uppercase tracking-widest mb-4 ${theme.stepLabel}`}>Step 1 — 手動入力</p>
+              <div className="space-y-3">
+                <div>
+                  <label className={`block text-sm mb-1 ${theme.labelPrimary}`}>
+                    店名 <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    value={manualBizName}
+                    onChange={e => setManualBizName(e.target.value)}
+                    placeholder="例：サロン・ド・ボーテ"
+                    className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme.input}`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm mb-1 ${theme.labelPrimary}`}>業種</label>
+                  <input
+                    value={manualIndustry}
+                    onChange={e => setManualIndustry(e.target.value)}
+                    placeholder="例：美容室、カフェ、整骨院、電気工事"
+                    className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme.input}`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm mb-1 ${theme.labelPrimary}`}>エリア / 住所</label>
+                  <input
+                    value={manualArea}
+                    onChange={e => setManualArea(e.target.value)}
+                    placeholder="例：東京都渋谷区神宮前3-1-1"
+                    className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme.input}`}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-sm mb-1 ${theme.labelPrimary}`}>電話番号</label>
+                    <input
+                      value={manualPhone}
+                      onChange={e => setManualPhone(e.target.value)}
+                      placeholder="03-0000-0000"
+                      className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme.input}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm mb-1 ${theme.labelPrimary}`}>価格帯</label>
+                    <input
+                      value={manualPriceRange}
+                      onChange={e => setManualPriceRange(e.target.value)}
+                      placeholder="例：¥3,000〜¥8,000"
+                      className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme.input}`}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className={`block text-sm mb-1 ${theme.labelPrimary}`}>営業時間</label>
+                  <input
+                    value={manualHours}
+                    onChange={e => setManualHours(e.target.value)}
+                    placeholder="例：火〜日 10:00〜20:00、月曜定休"
+                    className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme.input}`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm mb-1 ${theme.labelPrimary}`}>サービス内容</label>
+                  <input
+                    value={manualServices}
+                    onChange={e => setManualServices(e.target.value)}
+                    placeholder="例：カット、カラー、パーマ、トリートメント"
+                    className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme.input}`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm mb-1 ${theme.labelPrimary}`}>メニュー（任意）</label>
+                  <textarea
+                    value={manualMenu}
+                    onChange={e => setManualMenu(e.target.value)}
+                    rows={3}
+                    placeholder="例：カット ¥4,500 / カラー ¥7,000 / パーマ ¥9,000"
+                    className={`w-full border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${theme.input}`}
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Step 2: SNS・予約 */}
@@ -244,7 +396,7 @@ export default function Home() {
         {/* Generate Button */}
         <button
           onClick={handleGenerate}
-          disabled={loading || rawText.trim().length < 10}
+          disabled={isGenerateDisabled}
           className={`w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-colors text-sm mb-6 ${theme.disabledBtn}`}
         >
           {loading ? stepLabel : "サイトを生成する"}
