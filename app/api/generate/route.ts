@@ -255,6 +255,27 @@ LAYOUT RULES:
 - Cards: consistent border-radius (0px for editorial, 8px for warm, 4px for industrial)
 - Hover effects: translateY(-4px) + border-color change
 
+VISUAL EFFECTS:
+1. Vanilla Tilt.js
+   - Load from CDN just before </body>: <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.1/vanilla-tilt.min.js"></script>
+   - Add data-tilt data-tilt-max="8" data-tilt-scale="1.03" data-tilt-glare="false" to EVERY menu card and EVERY review card element
+   - Initialize after DOMContentLoaded: VanillaTilt.init(document.querySelectorAll("[data-tilt]"),{max:8,scale:1.03,glare:false})
+
+2. CSS scroll-snap
+   - On the <html> element: scroll-snap-type:y mandatory; overflow-y:scroll
+   - On EVERY <section> element: scroll-snap-align:start; scroll-snap-stop:always
+   - Do NOT add scroll-snap to navbar or footer
+
+3. Hero video loop background
+   - Inside the hero <section>, add as FIRST child: <video autoplay muted loop playsinline class="hero-video"></video> — no src attribute (fails gracefully, CSS fallback shows)
+   - .hero-video: position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:0
+   - Hero section base style: position:relative; overflow:hidden; background: linear-gradient(135deg, var(--bg) 0%, var(--bg2) 50%, var(--accent) 100%); background-size:200% 200%; animation:heroGradient 8s ease infinite
+   - @keyframes heroGradient { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+   - Add a .hero-zoom-bg child div (position:absolute; inset:0; background:inherit; z-index:0; animation:heroZoom 14s ease-in-out infinite; transform-origin:center center)
+   - @keyframes heroZoom { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+   - Add a .hero-overlay div (position:absolute; inset:0; background:rgba(0,0,0,0.45); z-index:1)
+   - Hero text content div: position:relative; z-index:2
+
 STRICT:
 - NO emojis. Use ◆ ● ▶ ★ for icons/bullets
 - CSS variables from theme colors
@@ -271,7 +292,7 @@ SOCIAL & RESERVATION:
 
 SECTIONS:
 1. Fixed navbar (name + 4 links + hamburger${safeInstagram ? " + Instagram icon link in nav" : ""})
-2. Hero 100vh (gradient bg + huge name + tagline + reservation CTA buttons based on enabled types)
+2. Hero 100vh (video loop bg + animated gradient fallback + heroZoom animation + overlay — see VISUAL EFFECTS #3; huge name + tagline + reservation CTA buttons based on enabled types)
 3. About (rating ★, hours table, service tags)
 4. Menu cards (max 6, ◆ bullet style)
 5. Reviews (2-3 cards with actual review text)
