@@ -262,12 +262,12 @@ VISUAL EFFECTS:
    - Initialize after DOMContentLoaded: VanillaTilt.init(document.querySelectorAll("[data-tilt]"),{max:8,scale:1.03,glare:false})
 
 2. CSS scroll-snap
-   - On the <html> element: scroll-snap-type:y mandatory; overflow-y:scroll
+   - On the <html> element: scroll-snap-type:y mandatory
    - On EVERY <section> element: scroll-snap-align:start; scroll-snap-stop:always
    - Do NOT add scroll-snap to navbar or footer
 
 3. Hero video loop background
-   - Inside the hero <section>, add as FIRST child: <video autoplay muted loop playsinline class="hero-video"></video> — no src attribute (fails gracefully, CSS fallback shows)
+   - Inside the hero <section>, as FIRST child: <video autoplay muted loop playsinline class="hero-video"></video> — no src attribute (fails gracefully, CSS fallback shows)
    - .hero-video: position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:0
    - Hero section base style: position:relative; overflow:hidden; background: linear-gradient(135deg, var(--bg) 0%, var(--bg2) 50%, var(--accent) 100%); background-size:200% 200%; animation:heroGradient 8s ease infinite
    - @keyframes heroGradient { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
@@ -276,11 +276,56 @@ VISUAL EFFECTS:
    - Add a .hero-overlay div (position:absolute; inset:0; background:rgba(0,0,0,0.45); z-index:1)
    - Hero text content div: position:relative; z-index:2
 
+4. Lenis smooth scroll
+   - Load from CDN just before </body>: <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.14/dist/lenis.min.js"></script>
+   - Initialize in the inline init script:
+     const lenis = new Lenis({ lerp: 0.1, smoothWheel: true });
+     function lenisRaf(time){ lenis.raf(time); requestAnimationFrame(lenisRaf); }
+     requestAnimationFrame(lenisRaf);
+   - Lenis handles page scroll; do NOT add overflow-y:scroll to html element (conflicts with Lenis)
+
+5. Custom cursor
+   - Add two elements immediately after <body>:
+     <div class="cursor-dot"></div>
+     <div class="cursor-ring"></div>
+   - CSS:
+     body { cursor: none; }
+     .cursor-dot { position:fixed; width:8px; height:8px; border-radius:50%; background:var(--accent); pointer-events:none; z-index:10000; transform:translate(-50%,-50%); top:0; left:0; }
+     .cursor-ring { position:fixed; width:32px; height:32px; border-radius:50%; border:1.5px solid var(--accent); pointer-events:none; z-index:9999; transform:translate(-50%,-50%); top:0; left:0; }
+     @media (hover: none) { .cursor-dot, .cursor-ring { display:none; } body { cursor:auto; } }
+   - JS (requestAnimationFrame lerp — smooth lag on ring):
+     const dot = document.querySelector('.cursor-dot');
+     const ring = document.querySelector('.cursor-ring');
+     let mx=0, my=0, rx=0, ry=0;
+     document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; dot.style.left=mx+'px'; dot.style.top=my+'px'; });
+     (function animRing(){ rx+=(mx-rx)*0.12; ry+=(my-ry)*0.12; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(animRing); })();
+
+6. AOS.js scroll animations
+   - In <head> add: <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css">
+   - Load JS just before </body>: <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+   - Initialize: AOS.init({ duration:800, once:true, disable: window.matchMedia('(prefers-reduced-motion:reduce)').matches });
+   - Apply data attributes — section headings/labels: data-aos="fade-up"; cards (staggered): data-aos="fade-up" data-aos-delay="100" (increment by 100 per card); side content/images: data-aos="fade-right"; stats/ratings: data-aos="zoom-in"
+   - Do NOT use IntersectionObserver for animations — AOS replaces it entirely
+
+7. Particles.js in hero section
+   - Load from CDN just before </body>: <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+   - Add <div id="particles-hero" style="position:absolute;inset:0;z-index:0;pointer-events:none;"></div> as FIRST child inside the hero section (before .hero-zoom-bg)
+   - Initialize after DOMContentLoaded using the resolved CSS variable value:
+     const accentHex = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#ffffff';
+     particlesJS('particles-hero', { particles:{ number:{value:80}, color:{value:accentHex}, opacity:{value:0.3,random:true}, size:{value:3,random:true}, move:{enable:true,speed:0.8,direction:'none',random:true,out_mode:'out'}, line_linked:{enable:false} }, interactivity:{ events:{onhover:{enable:false},onclick:{enable:false}} }, retina_detect:true });
+
+SCRIPT LOADING ORDER (just before </body>, in this exact sequence):
+  1. <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.1/vanilla-tilt.min.js"></script>
+  2. <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.14/dist/lenis.min.js"></script>
+  3. <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+  4. <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+  5. <script> /* single inline init block containing ALL initializations above */ </script>
+
 STRICT:
 - NO emojis. Use ◆ ● ▶ ★ for icons/bullets
 - CSS variables from theme colors
 - html tag must have lang="ja"
-- IntersectionObserver fade-up animations — wrap observer callback in: if(!window.matchMedia('(prefers-reduced-motion:reduce)').matches){...} so animations are skipped when the user has reduced motion enabled
+- Use AOS data attributes for all scroll animations (see VISUAL EFFECTS #6) — do NOT use IntersectionObserver
 - Mobile responsive (hamburger menu)
 - All text Japanese
 
@@ -292,7 +337,7 @@ SOCIAL & RESERVATION:
 
 SECTIONS:
 1. Fixed navbar (name + 4 links + hamburger${safeInstagram ? " + Instagram icon link in nav" : ""})
-2. Hero 100vh (video loop bg + animated gradient fallback + heroZoom animation + overlay — see VISUAL EFFECTS #3; huge name + tagline + reservation CTA buttons based on enabled types)
+2. Hero 100vh (particles layer + video loop bg + animated gradient fallback + heroZoom animation + overlay — see VISUAL EFFECTS #3 and #7; huge name + tagline + reservation CTA buttons based on enabled types)
 3. About (rating ★, hours table, service tags)
 4. Menu cards (max 6, ◆ bullet style)
 5. Reviews (2-3 cards with actual review text)
