@@ -43,6 +43,9 @@ export default function Home() {
   const [step, setStep]                     = useState<"idle" | "extracting" | "generating" | "done">("idle");
   const [darkMode, setDarkMode]             = useState(true);
   const [history, setHistory]               = useState<HistoryEntry[]>([]);
+  const [resultTab, setResultTab]           = useState<"site" | "sales">("site");
+  const [copiedEmail, setCopiedEmail]       = useState(false);
+  const [copiedDm, setCopiedDm]             = useState(false);
 
   useEffect(() => {
     try {
@@ -144,6 +147,7 @@ export default function Home() {
       setHtml(data.html);
       setBizInfo(data.bizInfo);
       setStep("done");
+      setResultTab("site");
 
       const entry: HistoryEntry = {
         businessName: data.bizInfo?.businessName || "不明",
@@ -184,7 +188,23 @@ export default function Home() {
     setHtml(entry.html);
     setBizInfo(entry.bizInfo);
     setStep("done");
+    setResultTab("site");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleCopyEmail = () => {
+    if (!bizInfo) return;
+    const { subject, body } = buildEmailContent(bizInfo);
+    navigator.clipboard.writeText(`件名：${subject}\n\n${body}`);
+    setCopiedEmail(true);
+    setTimeout(() => setCopiedEmail(false), 2000);
+  };
+
+  const handleCopyDm = () => {
+    if (!bizInfo) return;
+    navigator.clipboard.writeText(buildDmText(bizInfo));
+    setCopiedDm(true);
+    setTimeout(() => setCopiedDm(false), 2000);
   };
 
   const stepLabel = step === "extracting" ? "店舗情報を読み取り中..." : "サイトを生成中...";
@@ -457,50 +477,117 @@ export default function Home() {
         {/* Result */}
         {html && (
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className={`text-lg font-semibold ${theme.heading}`}>生成されたサイト</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleDownload}
-                  className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${theme.downloadBtn}`}
-                >
-                  ダウンロード
-                </button>
-                <button
-                  onClick={handleCopy}
-                  className="bg-green-700 hover:bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-                >
-                  {copied ? "コピーしました！" : "HTMLをコピー"}
-                </button>
-              </div>
+            {/* Result tab switcher */}
+            <div className={`border rounded-xl p-1 mb-4 flex gap-1 ${theme.modeBg}`}>
+              <button
+                onClick={() => setResultTab("site")}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  resultTab === "site" ? theme.modeActive : theme.modeInactive
+                }`}
+              >
+                生成サイト
+              </button>
+              <button
+                onClick={() => setResultTab("sales")}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  resultTab === "sales" ? theme.modeActive : theme.modeInactive
+                }`}
+              >
+                営業文面
+              </button>
             </div>
 
-            <div className={`rounded-xl overflow-hidden mb-6 border ${theme.card}`}>
-              <div className={`flex items-center gap-2 px-4 py-2 border-b ${theme.divider}`}>
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span className={`text-xs ml-2 ${theme.labelFaint}`}>プレビュー</span>
-              </div>
-              <iframe
-                srcDoc={html}
-                className="w-full h-[700px]"
-                title="サイトプレビュー"
-                sandbox="allow-scripts"
-              />
-            </div>
+            {resultTab === "site" ? (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className={`text-lg font-semibold ${theme.heading}`}>生成されたサイト</h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDownload}
+                      className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${theme.downloadBtn}`}
+                    >
+                      ダウンロード
+                    </button>
+                    <button
+                      onClick={handleCopy}
+                      className="bg-green-700 hover:bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                    >
+                      {copied ? "コピーしました！" : "HTMLをコピー"}
+                    </button>
+                  </div>
+                </div>
 
-            <div className={`rounded-xl overflow-hidden border ${theme.card}`}>
-              <div className={`flex items-center justify-between px-4 py-2 border-b ${theme.divider}`}>
-                <span className={`text-xs ${theme.labelFaint}`}>HTMLコード</span>
-                <button onClick={handleCopy} className={`text-xs ${theme.copyLink}`}>
-                  {copied ? "コピーしました！" : "コピー"}
-                </button>
+                <div className={`rounded-xl overflow-hidden mb-6 border ${theme.card}`}>
+                  <div className={`flex items-center gap-2 px-4 py-2 border-b ${theme.divider}`}>
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span className={`text-xs ml-2 ${theme.labelFaint}`}>プレビュー</span>
+                  </div>
+                  <iframe
+                    srcDoc={html}
+                    className="w-full h-[700px]"
+                    title="サイトプレビュー"
+                    sandbox="allow-scripts"
+                  />
+                </div>
+
+                <div className={`rounded-xl overflow-hidden border ${theme.card}`}>
+                  <div className={`flex items-center justify-between px-4 py-2 border-b ${theme.divider}`}>
+                    <span className={`text-xs ${theme.labelFaint}`}>HTMLコード</span>
+                    <button onClick={handleCopy} className={`text-xs ${theme.copyLink}`}>
+                      {copied ? "コピーしました！" : "コピー"}
+                    </button>
+                  </div>
+                  <pre className={`text-xs p-4 overflow-auto max-h-72 whitespace-pre-wrap ${theme.code}`}>
+                    {html}
+                  </pre>
+                </div>
               </div>
-              <pre className={`text-xs p-4 overflow-auto max-h-72 whitespace-pre-wrap ${theme.code}`}>
-                {html}
-              </pre>
-            </div>
+            ) : (
+              <div>
+                {/* メール文 */}
+                {bizInfo && (() => {
+                  const { subject, body } = buildEmailContent(bizInfo);
+                  return (
+                    <div className={`border rounded-xl p-5 mb-4 ${theme.card}`}>
+                      <div className="flex items-center justify-between mb-4">
+                        <p className={`text-xs font-bold uppercase tracking-widest ${theme.stepLabel}`}>メール文</p>
+                        <button
+                          onClick={handleCopyEmail}
+                          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${theme.toggleBtn}`}
+                        >
+                          {copiedEmail ? "コピーしました" : "全文コピー"}
+                        </button>
+                      </div>
+                      <div className={`border rounded-lg px-4 py-3 mb-3 ${theme.modeBg}`}>
+                        <p className={`text-xs mb-1 ${theme.labelFaint}`}>件名</p>
+                        <p className={`text-sm font-medium ${theme.labelPrimary}`}>{subject}</p>
+                      </div>
+                      <pre className={`text-sm whitespace-pre-wrap leading-relaxed ${theme.labelMuted}`}>{body}</pre>
+                    </div>
+                  );
+                })()}
+
+                {/* インスタ DM文 */}
+                {bizInfo && (
+                  <div className={`border rounded-xl p-5 ${theme.card}`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <p className={`text-xs font-bold uppercase tracking-widest ${theme.stepLabel}`}>インスタ DM文</p>
+                      <button
+                        onClick={handleCopyDm}
+                        className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${theme.toggleBtn}`}
+                      >
+                        {copiedDm ? "コピーしました" : "全文コピー"}
+                      </button>
+                    </div>
+                    <pre className={`text-sm whitespace-pre-wrap leading-relaxed ${theme.labelMuted}`}>
+                      {buildDmText(bizInfo)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -540,4 +627,46 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString("ja-JP", {
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
+}
+
+function buildEmailContent(info: Record<string, string>): { subject: string; body: string } {
+  const name = info.businessName || "貴店";
+  const industry = info.industry || "事業";
+  const area = info.area ? `${info.area}の` : "";
+  const subject = `【ホームページ制作のご提案】${name}様`;
+  const body = `${name} ご担当者様
+
+はじめてご連絡いたします。
+Webサイト制作を専門に行っております、[制作者名]と申します。
+
+この度、${area}${industry}を営まれている${name}様のために、
+ホームページを試作させていただきましたのでご連絡差し上げました。
+
+実際にご覧いただけるよう、デモサイトをご用意しております。
+お時間のある際に、ぜひ一度ご確認ください。
+
+現在のサイトと見比べていただき、もしご興味をお持ちいただけましたら、
+細かいご要望に合わせたカスタマイズも喜んで対応いたします。
+
+制作費用・スケジュールなど、お気軽にお問い合わせください。
+どうぞよろしくお願いいたします。
+
+[制作者名]
+[メールアドレス]
+[電話番号]`;
+  return { subject, body };
+}
+
+function buildDmText(info: Record<string, string>): string {
+  const name = info.businessName || "こちらのお店";
+  const industry = info.industry || "事業";
+  const area = info.area ? `${info.area}で` : "";
+  return `はじめまして！
+${area}${industry}をされている${name}さんのために、
+ホームページを試作してみました。
+
+デモサイトを作りましたので、よかったらご覧ください。
+ご興味があれば、カスタマイズしてご提供できます。
+
+お気軽にDMでご連絡ください！`;
 }
