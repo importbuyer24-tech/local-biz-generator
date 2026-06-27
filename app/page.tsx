@@ -5,6 +5,13 @@ import { useState, useEffect } from "react";
 type ReservationType = "phone" | "line" | "google";
 type InputMode = "google" | "manual";
 
+type SnsPost = {
+  day: number;
+  category: string;
+  caption: string;
+  hashtags: string[];
+};
+
 type HistoryEntry = {
   businessName: string;
   html: string;
@@ -43,9 +50,13 @@ export default function Home() {
   const [step, setStep]                     = useState<"idle" | "extracting" | "generating" | "done">("idle");
   const [darkMode, setDarkMode]             = useState(true);
   const [history, setHistory]               = useState<HistoryEntry[]>([]);
-  const [resultTab, setResultTab]           = useState<"site" | "sales">("site");
+  const [resultTab, setResultTab]           = useState<"site" | "sales" | "sns">("site");
   const [copiedEmail, setCopiedEmail]       = useState(false);
   const [copiedDm, setCopiedDm]             = useState(false);
+  const [snsPosts, setSnsPosts]             = useState<SnsPost[]>([]);
+  const [snsLoading, setSnsLoading]         = useState(false);
+  const [snsError, setSnsError]             = useState("");
+  const [copiedPost, setCopiedPost]         = useState<number | null>(null);
 
   useEffect(() => {
     try {
@@ -190,6 +201,34 @@ export default function Home() {
     setStep("done");
     setResultTab("site");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleGenerateSns = async () => {
+    if (!bizInfo) return;
+    setSnsLoading(true);
+    setSnsError("");
+    setSnsPosts([]);
+    try {
+      const res = await fetch("/api/generate-sns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bizInfo }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "生成失敗");
+      setSnsPosts(data.posts);
+    } catch (e: unknown) {
+      setSnsError(e instanceof Error ? e.message : "エラーが発生しました");
+    } finally {
+      setSnsLoading(false);
+    }
+  };
+
+  const handleCopyPost = (post: SnsPost, index: number) => {
+    const text = `${post.caption}\n\n${post.hashtags.join(" ")}`;
+    navigator.clipboard.writeText(text);
+    setCopiedPost(index);
+    setTimeout(() => setCopiedPost(null), 2000);
   };
 
   const handleCopyEmail = () => {
@@ -495,9 +534,83 @@ export default function Home() {
               >
                 営業文面
               </button>
+              <button
+                onClick={() => setResultTab("sns")}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  resultTab === "sns" ? theme.modeActive : theme.modeInactive
+                }`}
+              >
+                SNS30日分
+              </button>
             </div>
 
-            {resultTab === "site" ? (
+            {resultTab === "sns" ? (
+              <div>
+                {snsPosts.length === 0 ? (
+                  <div className={`border rounded-xl p-8 text-center ${theme.card}`}>
+                    <p className={`text-sm mb-2 ${theme.labelPrimary}`}>
+                      {bizInfo?.businessName}向けのInstagram投稿を30日分自動生成します
+                    </p>
+                    <p className={`text-xs mb-6 ${theme.labelFaint}`}>
+                      カテゴリをバランスよく配分・ハッシュタグ付き
+                    </p>
+                    {snsError && (
+                      <div className={`mb-4 border rounded-lg px-4 py-3 text-sm ${theme.error}`}>
+                        {snsError}
+                      </div>
+                    )}
+                    <button
+                      onClick={handleGenerateSns}
+                      disabled={snsLoading}
+                      className="bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900 disabled:text-purple-400 text-white font-bold py-3 px-8 rounded-xl transition-colors text-sm"
+                    >
+                      {snsLoading ? "生成中…（30秒ほどかかります）" : "30日分の投稿を生成する"}
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <p className={`text-sm font-semibold ${theme.labelPrimary}`}>
+                        30日分の投稿ネタ
+                      </p>
+                      <button
+                        onClick={handleGenerateSns}
+                        disabled={snsLoading}
+                        className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${theme.toggleBtn}`}
+                      >
+                        {snsLoading ? "再生成中…" : "再生成"}
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {snsPosts.map((post, i) => (
+                        <div key={i} className={`border rounded-xl p-4 ${theme.card}`}>
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${theme.badge}`}>
+                                Day {post.day}
+                              </span>
+                              <span className={`text-xs ${theme.labelFaint}`}>{post.category}</span>
+                            </div>
+                            <button
+                              onClick={() => handleCopyPost(post, i)}
+                              className={`shrink-0 text-xs px-3 py-1.5 rounded-lg border transition-colors ${theme.toggleBtn}`}
+                            >
+                              {copiedPost === i ? "コピー済み" : "コピー"}
+                            </button>
+                          </div>
+                          <p className={`text-sm whitespace-pre-wrap leading-relaxed mb-2 ${theme.labelMuted}`}>
+                            {post.caption}
+                          </p>
+                          <p className={`text-xs leading-relaxed ${theme.labelFaint}`}>
+                            {post.hashtags.join(" ")}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : resultTab === "site" ? (
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h2 className={`text-lg font-semibold ${theme.heading}`}>生成されたサイト</h2>
