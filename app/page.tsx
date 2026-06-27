@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 type ReservationType = "phone" | "line" | "google";
 type InputMode = "google" | "manual";
@@ -257,6 +258,12 @@ export default function Home() {
           <div>
             <h1 className={`text-3xl font-bold mb-2 ${theme.heading}`}>AIサイト自動生成</h1>
             <p className={`text-sm ${theme.labelMuted}`}>店舗情報からプロ品質のサイトを自動生成します</p>
+            <Link
+              href="/sns-planner"
+              className={`inline-block mt-2 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${theme.toggleBtn}`}
+            >
+              SNS運用プランナー →
+            </Link>
           </div>
           <button
             onClick={() => setDarkMode(d => !d)}
