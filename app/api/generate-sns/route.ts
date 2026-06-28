@@ -6,7 +6,7 @@ const client = new Anthropic();
 export async function POST(req: NextRequest) {
   const { bizInfo } = await req.json();
 
-  if (!bizInfo?.businessName) {
+  if (!bizInfo?.businessName && !bizInfo?.industry) {
     return NextResponse.json({ error: "店舗情報がありません" }, { status: 400 });
   }
 
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ posts });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "API エラーが発生しました" }, { status: 500 });
+    const msg = error instanceof Error ? error.message : "不明なエラー";
+    return NextResponse.json({ error: `API エラー: ${msg}` }, { status: 500 });
   }
 }
