@@ -61,7 +61,7 @@ postsは30件作成。カテゴリの配分:
   try {
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 10000,
+      max_tokens: 16000,
       messages: [{ role: "user", content: prompt }],
     });
 
@@ -79,6 +79,7 @@ postsは30件作成。カテゴリの配分:
     return NextResponse.json({ plan });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "API エラーが発生しました" }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: `API エラー: ${msg}` }, { status: 500 });
   }
 }
